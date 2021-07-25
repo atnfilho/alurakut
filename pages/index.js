@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import MainGrid from "../src/components/MainGrid";
 import Box from "../src/components/Box";
 import {
@@ -7,6 +7,8 @@ import {
   OrkutNostalgicIconSet,
 } from "../src/lib/AlurakutCommons";
 import { ProfileRelationsBoxWrapper } from "../src/components/ProfileRelations";
+import nookies from "nookies";
+import jwt from "jsonwebtoken";
 
 function ProfileSidebar(propriedades) {
   return (
@@ -30,8 +32,31 @@ function ProfileSidebar(propriedades) {
   );
 }
 
-export default function Home() {
-  const githubUser = "atnfilho";
+function ProfileRelationsBox(props) {
+  return (
+    <ProfileRelationsBoxWrapper>
+      <h2 className="smallTitle">
+        {props.title}({props.items.length})
+      </h2>
+      <ul>
+        {props.items.map((item) => {
+          console.log(item);
+          return (
+            <li key={item}>
+              <a href={item.html_url} target="_blank">
+                <img src={item.avatar_url} />
+                <span>{item.login}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </ProfileRelationsBoxWrapper>
+  );
+}
+
+export default function Home(props) {
+  const githubUser = props.githubUser;
   const [comunidades, setComunidades] = useState([
     {
       id: new Date().toISOString(),
@@ -45,12 +70,24 @@ export default function Home() {
     "peas",
     "rafaballerini",
     "marcobrunodev",
-    "felipefialho",
+    "murilozano",
   ];
+
+  const [seguidores, setSeguidores] = useState([]);
+
+  useEffect(() => {
+    fetch(`https://api.github.com/users/${githubUser}/followers`)
+      .then((response) => {
+        return response.json();
+      })
+      .then((response) => {
+        setSeguidores(response);
+      });
+  }, []);
 
   return (
     <>
-      <AlurakutMenu />
+      <AlurakutMenu githubUser={githubUser} />
       <MainGrid>
         <div className="profileArea" style={{ gridArea: "profileArea" }}>
           <ProfileSidebar githubUser={githubUser} />
@@ -88,8 +125,8 @@ export default function Home() {
                 <input
                   type="text"
                   name="image"
-                  aria-label="Coloque um url para ser usada como capa"
-                  placeholder="Coloque um url para ser usada como capa"
+                  aria-label="Coloque uma url para ser usada como capa"
+                  placeholder="Coloque uma url para ser usada como capa"
                 />
               </div>
               <button>Criar comunidade</button>
@@ -106,7 +143,6 @@ export default function Home() {
             </h2>
             <ul>
               {pessoasFavoritas.map((pessoa, index) => {
-                console.log(pessoa);
                 return (
                   <li key={index}>
                     <a href={`/users/${pessoa}`}>
@@ -118,6 +154,9 @@ export default function Home() {
               })}
             </ul>
           </ProfileRelationsBoxWrapper>
+
+          <ProfileRelationsBox title="Seguidores" items={seguidores} />
+
           <ProfileRelationsBoxWrapper>
             <h2 className="smallTitle">Comunidades ({comunidades.length})</h2>
             <ul>
@@ -137,4 +176,34 @@ export default function Home() {
       </MainGrid>
     </>
   );
+}
+
+export async function getServerSideProps(ctx) {
+  const cookies = nookies.get(ctx);
+  const token = cookies.USER_TOKEN;
+  const decodedToken = jwt.decode(token);
+  const githubUser = decodedToken?.githubUser;
+
+  if (!githubUser) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  // const followers = await fetch(`https://api.github.com/users/${githubUser}/followers`)
+  //   .then((res) => res.json())
+  //   .then(followers => followers.map((follower) => ({
+  //     id: follower.id,
+  //     name: follower.login,
+  //     image: follower.avatar_url,
+  //   })));
+
+  return {
+    props: {
+      githubUser,
+    }
+  }
 }
